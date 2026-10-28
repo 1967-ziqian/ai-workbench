@@ -1,0 +1,37 @@
+# ===== 密钥与凭证（绝对禁止入库） =====
+*.key
+*.pem
+*secret*
+*_key.txt
+*key*.txt
+deepseek_key.txt
+*dsh*cookie*
+*_cookie.txt
+*bilibili*sessdata*
+*.token
+
+# ===== 私人档案 / 真实个人数据（用模板替代） =====
+私人档案/
+杨彪的私人档案/
+*私人档案*
+真实错题册*
+*进度台账*真实*
+
+# ===== 本地配置（含个人路径，不入库） =====
+*.local.js
+config.local.*
+.env
+.env.*
+local-config*
+
+# ===== 编辑器 / 系统 =====
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# ===== 依赖 =====
+node_modules/
+
+# ===== WorkBuddy 内部 =====
+.workbuddy/
