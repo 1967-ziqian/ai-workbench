@@ -2,7 +2,7 @@
 
 辅助 AI 协作的**可成长知识系统**：把"方法论"沉淀成可复用、可联动的知识资产，让任何 AI 都能读、能套、能进化。
 
-> 仓库初始名 `ai-`（GitHub 自动 slug），建议在仓库 Settings → Repository name 改为 `ai-workbench`。
+> 仓库地址：https://github.com/1967-ziqian/ai-workbench
 
 ## 三大组件
 
