@@ -1,0 +1,21 @@
+{
+  "id": "method-library",
+  "name": "方法库",
+  "description": "方法库：左边是按类型分组的目录（方法 / 自动化 / 素材 / 文档，组可折叠展开），右边是正文——上方身份卡（名称/何时用/何时不用/出处），下方全文。人和 AI 看的是同一批 .md。",
+  "layout": "grid",
+  "theme": "dark",
+  "panels": [
+    {
+      "id": "ml-main",
+      "title": "方法库",
+      "sub": "左边分组目录（方法/自动化/素材/文档，可折叠） · 右边正文 · 身份卡在正文最上方",
+      "type": "method-lib",
+      "root": "../method-library",
+      "default": "_INDEX.md",
+      "col": 1,
+      "row": 1,
+      "w": 4,
+      "h": 1
+    }
+  ]
+}

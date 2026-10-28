@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>子谦的工作台</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="boot-overlay" data-anim="ideal">
+  <div class="boot-card">
+    <div class="boot-logo"></div>
+    <div class="boot-title" style="display:none">DeepSeek Harness</div>
+    <div class="boot-stage" id="boot-stage">正在启动…</div>
+    <div class="boot-meta"><span id="boot-pct">0%</span><span id="boot-detail">BOOT</span></div>
+  </div>
+  <div class="boot-bar"><i id="boot-bar-in"></i></div>
+</div>
+
+<!-- ① 顶栏 -->
+<header id="titlebar">
+  <div class="titlebar-drag">
+    <span class="brand">子谦的工作台 <span class="brand-ver" id="ver">v0.1</span></span>
+    <span id="webai-strip" class="webai-strip"></span>
+  </div>
+  <div class="titlebar-controls">
+    <button id="tbs-load" class="tbs-pill tbs-load" title="本机负载">CPU — · GPU — · MEM —</button>
+    <button id="btn-folder" class="folder-chip" title="打开工作文件夹">📁 文件夹</button>
+    <button id="btn-mubu" class="folder-chip" title="打开幕布">📝 幕布</button>
+    <button id="btn-workbuddy" class="folder-chip" title="打开 WorkBuddy">🤖 WorkBuddy</button>
+    <button class="tb-btn" id="btn-refresh" title="刷新场景">⟳</button>
+    <button class="tb-btn" id="btn-more" title="更多">⋯</button>
+    <span class="tb-sep"></span>
+    <button class="tb-btn" id="btn-min">─</button>
+    <button class="tb-btn" id="btn-max">□</button>
+    <button class="tb-btn tb-close" id="btn-close">✕</button>
+    <div id="tb-more-panel" class="tb-more-panel">
+      <button class="tb-more-item" data-act="onboard">配置引导</button>
+      <button class="tb-more-item" data-act="theme-cycle">外观：深色（点击切换）</button>
+      <button class="tb-more-item" data-act="tabnum">窗口序号：关</button>
+      <button class="tb-more-item" data-act="ver">版本信息</button>
+      <button class="tb-more-item" data-act="mem">初始化记忆模板</button>
+      <button class="tb-more-item" data-act="dir">打开场景目录</button>
+    </div>
+  </div>
+</header>
+
+<!-- ② 场景切换条 -->
+<header id="scenebar">
+  <span class="scenebar-label">工作台</span>
+  <nav id="scenario-tabs"></nav>
+  <div class="scenebar-right">
+    <span id="status-dot" class="status-dot"></span>
+    <span id="status-text">连接中…</span>
+  </div>
+</header>
+
+<!-- ③ 引擎视图（默认界面 = DeepSeek Harness 原始界面） -->
+<section id="engine-view" class="view active">
+  <div id="engine-slot"></div>
+  <div id="engine-off" class="engine-off">
+    <div class="engine-off-card">
+      <b>引擎还没连上</b>
+      <p id="engine-off-url">—</p>
+      <p id="engine-off-msg">—</p>
+      <button id="engine-retry" class="tb-btn" style="border:1px solid var(--line);padding:6px 14px">⟳ 重试</button>
+    </div>
+  </div>
+</section>
+
+<!-- ④ 场景视图 -->
+<section id="scenario-view" class="view">
+  <div id="grid"></div>
+</section>
+
+<script src="app.js"></script>
+<div id="onboard" class="onboard-mask" style="display:none">
+  <div class="onboard-card">
+    <h3>先把这套接上你自己的 DSH（3 步）</h3>
+    <ol>
+      <li><b>复制提示词</b>：点下面的按钮，粘给你自己的 DSH，让它替你填配置、建会话。</li>
+      <li><b>重启外壳</b>：关掉这个窗口重新打开。</li>
+      <li><b>看绿点</b>：顶栏出现「Harness 已连接」就成功了。</li>
+    </ol>
+    <div class="onboard-actions">
+      <button id="ob-copy" class="tb-btn primary">复制给 DSH 的提示词</button>
+      <button id="ob-guide" class="tb-btn">打开《引导.md》</button>
+      <button id="ob-close" class="tb-btn">我已填好，知道了</button>
+    </div>
+    <p class="onboard-note">这 4 样只写进你本机的 config.local.json 和 scenarios，不会上传。</p>
+  </div>
+</div>
+</body>
+</html>

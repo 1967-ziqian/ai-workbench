@@ -1,0 +1,8 @@
+{
+  "engineUrl": "http://127.0.0.1:3080/",
+  "engineToken": "",
+  "methodLibraryRoot": "../method-library",
+  "selfReviewRoot": "../self-review",
+  "dshCmd": "dsh",
+  "_note": "engineUrl/engineToken 填 DSH web 引擎地址与 token。methodLibraryRoot/selfReviewRoot 是你的方法库与复盘目录（绝对路径，或相对本插件目录的相对路径）。dshCmd 是 DSH 引擎可执行命令（默认 dsh，找不到就填绝对路径）。本机私密配置写 config.local.json，不入库。"
+}
