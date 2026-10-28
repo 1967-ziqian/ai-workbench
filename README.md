@@ -24,12 +24,14 @@
 - [WorkBuddy](https://www.workbuddy.cn)（壳是 WB 插件）
 - DSH 引擎（壳默认界面，需自备 token）
 
-## 安装与使用（待壳路径配置化后完善）
+## 安装与使用
 
-1. 用 WorkBuddy 打开本仓库的 `shell/` 作为插件
-2. 在配置里指定你自己的「方法库目录」和「复盘目录」
+→ 第一次部署请直接看 **[开箱指南](开箱指南.md)**（含一段可直接复制给 AI 的开箱部署提示词）。
+
+1. 用 WorkBuddy 加载本仓库的 `shell/` 作为插件
+2. 改 `shell/config.json` 指定你自己的「方法库目录」和「复盘目录」
 3. 启用 `workbench-route-progress` skill
-4. 详细见各组件目录的 README
+4. 详细见各组件目录的 README 与开箱指南
 
 ## 许可
 
