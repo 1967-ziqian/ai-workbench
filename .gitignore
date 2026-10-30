@@ -33,5 +33,10 @@ Thumbs.db
 # ===== 依赖 =====
 node_modules/
 
+# ===== 自检 / 运行产物（每次跑 selftest 会重新生成） =====
+selftest*.png
+main.log
+学习/
+
 # ===== WorkBuddy 内部 =====
 .workbuddy/

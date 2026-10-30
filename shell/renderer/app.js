@@ -7,8 +7,10 @@ const API = window['kun'];
 
 // 场景标签图标（与完整版同款，内联 SVG）
 const SCENE_ICONS = {
+  'learning': "<svg width=\"17\" height=\"17\" viewBox=\"0 0 16 16\" fill=\"none\" aria-hidden=\"true\"><path d=\"M8 4.3C6.6 3.2 4.6 2.9 2.8 3.2v8.6c1.8-.3 3.8 0 5.2 1 1.4-1 3.4-1.3 5.2-1V3.2C11.4 2.9 9.4 3.2 8 4.3Z\" stroke=\"#8fb4ff\" stroke-width=\"1.3\" stroke-linejoin=\"round\"/><path d=\"M8 4.5v8.3\" stroke=\"#8fb4ff\" stroke-width=\"1.3\" stroke-linecap=\"round\"/><circle cx=\"11.6\" cy=\"6.5\" r=\"1.4\" fill=\"#8fb4ff\" opacity=\".8\"/></svg>",
   'self-review': "<svg width=\"17\" height=\"17\" viewBox=\"0 0 16 16\" fill=\"none\" aria-hidden=\"true\"><path d=\"M13.1 8A5.1 5.1 0 1 1 11.4 4.1\" stroke=\"#8fb4ff\" stroke-width=\"1.5\" stroke-linecap=\"round\"/><path d=\"M13.5 2.2v3h-3\" stroke=\"#8fb4ff\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><rect x=\"5.6\" y=\"5.9\" width=\"4.8\" height=\"6.2\" rx=\"1\" fill=\"#8fb4ff\" opacity=\".85\"/><rect x=\"6.9\" y=\"7.6\" width=\"2.2\" height=\".9\" rx=\".45\" fill=\"#0b1220\" opacity=\".5\"/><rect x=\"6.9\" y=\"9.4\" width=\"2.2\" height=\".9\" rx=\".45\" fill=\"#0b1220\" opacity=\".5\"/></svg>",
   'method-library': "<svg width=\"17\" height=\"17\" viewBox=\"0 0 16 16\" fill=\"none\" aria-hidden=\"true\"><path d=\"M2.6 3.1a1 1 0 0 1 1-1h3.1c.55 0 1 .45 1 1v9.4a.7.7 0 0 1-.7.7H3.6a1 1 0 0 1-1-1V3.1Z\" stroke=\"#7ee0c4\" stroke-width=\"1.3\" stroke-linejoin=\"round\"/><path d=\"M13.4 3.1a1 1 0 0 0-1-1H9.3c-.55 0-1 .45-1 1v9.4a.7.7 0 0 0 .7.7h2.4a1 1 0 0 0 1-1V3.1Z\" stroke=\"#7ee0c4\" stroke-width=\"1.3\" stroke-linejoin=\"round\"/><path d=\"M4.1 4.9h1.9M4.1 6.7h1.9M9.9 4.9h1.9M9.9 6.7h1.9\" stroke=\"#7ee0c4\" stroke-width=\"1.1\" stroke-linecap=\"round\" opacity=\".75\"/></svg>",
+  'library': '<svg width="17" height="17" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2.4 3.1a1 1 0 0 1 1-1h2.2a1 1 0 0 1 .86.5l.54.86a1 1 0 0 0 .86.5h4.7a1 1 0 0 1 1 1v6.9a1 1 0 0 1-1 1H3.4a1 1 0 0 1-1-1V3.1Z" stroke="#8fb4ff" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.4 6.4h9.6" stroke="#8fb4ff" stroke-width="1.1" opacity=".7"/><path d="M4.7 9.2h6.1M4.7 11.2h3.8" stroke="#8fb4ff" stroke-width="1.1" stroke-linecap="round" opacity=".75"/></svg>',
 };
 
 const state = { scenarios: [], current: null, previewTarget: null, view: '' };
@@ -354,6 +356,16 @@ function buildPanel(sc, p) {
     renderUsagePanel(body, p);           // 下方：用得怎么样（使用记录聚合）
   } else if (ptype === 'method-lib') {
     renderMethodLib(body, p);            // 方法库：左目录 + 右正文（身份卡 + 全文）
+  } else if (ptype === 'learn-main') {
+    renderLearnMain(body, p, box);       // 学习主区：上课 / 复习（闭卷 + 锚点回源）
+  } else if (ptype === 'learn-nav') {
+    renderLearnNav(body, p);             // 学习左栏：主题 + 今日到期 + 课列表
+  } else if (ptype === 'lib-tree') {
+    renderLibTree(body, p);              // 图书馆左栏：领域 → 主题 → 单元
+  } else if (ptype === 'lib-unit') {
+    renderLibUnit(body, p, box);        // 图书馆中栏：选中单元的正文（方法挂 box 上）
+  } else if (ptype === 'lib-due') {
+    renderLibDue(body, p);               // 图书馆右栏：今日到期（课程 + 各领域合并）
   } else if (ptype === 'review-files' || ptype === 'file') {
     renderFilePanel(body, p);
   } else if (ptype === 'harness') {
@@ -1298,6 +1310,360 @@ async function renderMethodLib(body, p) {
   }
 }
 
+// ── 学习场景（2026-10-29 新增）──────────────────────────
+// 壳只做三件事：列（课）、渲染（课 HTML）、记（完成/复习）。
+// 出课、出题、改稿都在会话里做——界面不做创作，只做使用（规格 v3 第六节）。
+// 写入走 main.js 的 fs:write：只许写配置的学习目录下、只许 .jsonl/.json/.md、写前存覆盖式 .bak。
+//
+// **到期、间隔、判分一次都不许在这里算**：它们全在 Python 内核
+// （tools/learn_core.py / learn_store.py，经 tools/learn_cli.py 暴露）。
+// 这里曾经复刻过 LADDER 与 due 公式，结果两套口径：界面把 items.jsonl 整体重写，
+// 连 seq 都写没了，而内核那边早就不从 items 读调度了。问内核，别抄公式。
+const dstr = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const todayStr = () => dstr(new Date());
+function fileUrl(p) { return 'file:///' + encodeURI(String(p).replace(/\\/g, '/')).replace(/#/g, '%23'); }
+
+function learnPaths(p) {
+  const root = String(p.root || './学习').replace(/[\\/]+$/, '');
+  const dir = p.topic ? root + '/' + p.topic : root;
+  return { dir, lessons: dir + '/lessons', records: dir + '/records', items: dir + '/items.jsonl', mission: dir + '/mission.md' };
+}
+
+async function learnLessons(P) {
+  const r = await API.fs.list(P.lessons);
+  if (!r.ok) return [];
+  return r.items.filter((x) => !x.dir && /\.html$/i.test(x.name)).map((x) => {
+    const m = x.name.match(/^(\d+)[\s._-]*(.*)\.html$/i);
+    return { no: m ? m[1] : x.name.replace(/\.html$/i, ''), title: m ? (m[2] || x.name) : x.name, path: P.lessons + '/' + x.name, name: x.name };
+  }).sort((a, b) => a.no.localeCompare(b.no));
+}
+
+// 内核通道：所有「算」的动作都问这里。失败要说出话，不许静默当成「没有」。
+async function learnCall(P, req) {
+  if (!API.learn || !API.learn.call) {
+    return { ok: false, code: 'no_bridge', msg: '壳还没重启：learn:call 没加载（改过 main.js/preload.js 必须重开工作台）' };
+  }
+  return API.learn.call(Object.assign({ workdir: P.dir }, req || {}));
+}
+
+// 课末小结：证据进内核（records.jsonl），笔记另写一份 md 给人看。
+// delivered 只认内核那条——md 是交付物，不是证据（DS 定的口径）。
+async function learnFinish(P, summary) {
+  return learnCall(P, Object.assign({ cmd: 'finish', kind: 'lesson_end' }, summary));
+}
+
+async function learnRecords(P) {
+  const r = await API.fs.list(P.records);
+  if (!r.ok) return [];
+  return r.items.filter((x) => !x.dir).map((x) => x.name);
+}
+
+// 「下一课」= 没完成过的课里编号最小的那门。完成与否问内核，不看 records/*.md 文件名。
+async function learnNext(P, ls) {
+  const st = await learnCall(P, { cmd: 'stats' });
+  const done = (st.ok && st.delivered) || [];
+  return ls.find((x) => done.indexOf(String(x.no)) < 0) || ls[0] || null;
+}
+
+// 交错：按课分组轮流抽，避免一轮复习全是同一课的题（规格第四节第 1 条）
+function interleaveByLesson(list) {
+  const buckets = new Map();
+  list.forEach((it) => { const k = it.lesson || '_'; if (!buckets.has(k)) buckets.set(k, []); buckets.get(k).push(it); });
+  const keys = [...buckets.keys()].sort();
+  const out = [];
+  let more = true;
+  while (more) {
+    more = false;
+    keys.forEach((k) => { const b = buckets.get(k); if (b.length) { out.push(b.shift()); more = true; } });
+  }
+  return out;
+}
+
+function learnWrite(path, text) {
+  if (!API.fs || !API.fs.write) return Promise.resolve({ ok: false, why: '壳还没重启：fs:write 没加载（改过 main.js/preload.js 必须重启工作台）' });
+  return API.fs.write(path, text);
+}
+
+// 从 mission.md 里抠一句「终点」（期望表现）当导航页的定盘星
+function learnGoal(md) {
+  const lines = String(md || '').replace(/\r\n/g, '\n').split('\n');
+  let on = false;
+  for (const ln of lines) {
+    if (/^##+\s*终点/.test(ln)) { on = true; continue; }
+    if (on) {
+      const t = ln.replace(/^[\s>*-]+/, '').trim();
+      if (!t) continue;
+      if (/^#/.test(ln)) break;
+      return trunc(t.replace(/\*\*/g, ''), 78);
+    }
+  }
+  return '';
+}
+
+// 主区：上课 / 复习
+async function renderLearnMain(body, p, box) {
+  const P = learnPaths(p);
+  body.classList.add('ln-body');
+  body.innerHTML = '';
+
+  const tabs = el('div', 'ln-tabs');
+  const bL = el('button', 'ln-tab active', '上课');
+  const bR = el('button', 'ln-tab', '复习');
+  tabs.appendChild(bL); tabs.appendChild(bR);
+  const stage = el('div', 'ln-stage');
+  body.appendChild(tabs); body.appendChild(stage);
+
+  // 复习队列/统计归 createReviewer 管（与图书馆共用），这里只留上课相关的状态
+  const ctx = { lesson: null, wv: null, t0: 0, wantReview: false };
+
+
+  const setTab = (which) => {
+    bL.classList.toggle('active', which === 'lesson');
+    bR.classList.toggle('active', which === 'review');
+  };
+
+  // ── 上课 ──
+  async function open(filePath) {
+    setTab('lesson');
+    const ls = await learnLessons(P);
+    const L = ls.find((x) => x.path === filePath) || ls[0] || null;
+    ctx.lesson = L;
+    stage.innerHTML = '';
+    if (!L) { stage.appendChild(el('div', 'ph', 'lessons/ 里还没有课')); return; }
+    const wv = document.createElement('webview');
+    wv.setAttribute('src', fileUrl(L.path));
+    ctx.t0 = Date.now();          // 用于「完成本课」的用时，别让用户自己填
+    // 桥：课页只认 window.__learn，判分/续点/到期全由它转给内核。
+    // preload 必须是绝对 file:// URL（相对路径 webview 不认，会静默没有桥）。
+    wv.setAttribute('preload', new URL('../lesson-preload.js', location.href).href);
+    wv.setAttribute('partition', 'persist:learn');
+    wv.setAttribute('allowpopups', '');
+    wv.className = 'ln-frame';
+    stage.appendChild(wv);
+    ctx.wv = wv;
+    const bar = el('div', 'ln-bar');
+    bar.appendChild(el('span', 'ln-bar-t', L.no + ' · ' + L.title));
+    const done = el('button', 'ln-done', '完成本课');
+    done.addEventListener('click', () => openSheet(bar, L));
+    bar.appendChild(done);
+    stage.appendChild(bar);
+  }
+
+  // 「完成本课」→ 证据写内核（records.jsonl），笔记另写 records/NN-YYYYMMDD.md
+  // 错因必须四选一或选「没问出来」，**不许默认**——一有默认值，四类错因分布立刻失真。
+  function openSheet(bar, L) {
+    if (stage.querySelector('.ln-sheet')) return;
+    const sh = el('div', 'ln-sheet');
+    sh.appendChild(el('div', 'ln-sheet-t', '完成本课 · ' + L.no));
+    const mk = (ph) => { const i = el('input', 'ln-in'); i.placeholder = ph; return i; };
+    const iSelf = mk('自测：对几题 / 共几题（如 4/6）');
+    const selKind = document.createElement('select');
+    selKind.className = 'ln-in';
+    [['', '卡点：没有卡点（这课通了）'],
+     ['概念缺失', '卡点：概念缺失（这一步不知道是什么）'],
+     ['程序错序', '卡点：程序错序（知道步骤，顺序错了）'],
+     ['表征不当', '卡点：表征不当（换个说法就懂，原来的讲法不行）'],
+     ['注意力漏读', '卡点：注意力漏读（题里说了，没看到）'],
+     ['unclassified', '卡点：问不出来（问了也说不清——先记下，别归类）'],
+    ].forEach(([v, t]) => {
+      const o = document.createElement('option'); o.value = v; o.textContent = t; selKind.appendChild(o);
+    });
+    const iStuck = mk('卡点具体卡在哪（一句话；没卡点留空）');
+    const iNext = mk('下一课方向：这次记录要改什么（留空=按原计划）');
+    sh.appendChild(iSelf); sh.appendChild(selKind); sh.appendChild(iStuck); sh.appendChild(iNext);
+    const acts = el('div', 'ln-sheet-a');
+    const save = el('button', 'ln-go', '保存记录');
+    const cancel = el('button', 'ln-cancel', '取消');
+    acts.appendChild(save); acts.appendChild(cancel);
+    sh.appendChild(acts);
+    stage.appendChild(sh);
+    cancel.addEventListener('click', () => sh.remove());
+    save.addEventListener('click', async () => {
+      const day = todayStr();
+      const selfTxt = iSelf.value.trim();
+      const m = selfTxt.match(/(\d+)\s*\/\s*(\d+)/);
+      const acc = m && Number(m[2]) > 0 ? Number(m[1]) / Number(m[2]) : null;
+      const kind = selKind.value;
+      const stuck = iStuck.value.trim();
+      const elapsed = ctx.t0 ? Math.round((Date.now() - ctx.t0) / 1000) : 0;
+
+      const summary = { lesson: L.no, has_gap: !!kind };
+      if (kind) summary.error_kind = kind;
+      else {
+        if (acc == null) { sh.appendChild(el('div', 'ln-warn', '没卡点要填「对 X / 共 Y」——否则这课等于没测')); return; }
+        summary.accuracy = Math.round(acc * 1000) / 1000;
+        summary.elapsed_s = elapsed;
+      }
+      if (stuck) summary.gap = stuck;
+      if (iNext.value.trim()) summary.next = iNext.value.trim();
+
+      const r = await learnFinish(P, summary);
+      if (!r.ok) {
+        // 内核拒收就是不落盘，别偷偷写一份 md 让它看起来成功
+        sh.appendChild(el('div', 'ln-warn', '没记上：' + (r.msg || (r.errs || []).join('；'))));
+        return;
+      }
+      const md = '# ' + L.no + ' · ' + L.title + '\n\n' +
+        '- 日期：' + day + '\n' +
+        '- 自测：' + (selfTxt || '—') + '\n' +
+        '- 卡点：' + (kind ? (kind + (stuck ? '｜' + stuck : '')) : '无') + '\n' +
+        '- 下一课方向：' + (iNext.value.trim() || '按原计划') + '\n' +
+        '- 用时：' + elapsed + ' 秒\n';
+      const path = P.records + '/' + L.no + '-' + day.replace(/-/g, '') + '.md';
+      const r2 = await learnWrite(path, md);
+      sh.remove();
+      bar.appendChild(el('span', 'ln-ok', r2.ok ? '已记录' : '证据记上了，笔记没写成（' + r2.why + '）'));
+      if (window.onLearnItems) window.onLearnItems();
+    });
+  }
+
+  // ── 复习 ──
+  // 与图书馆共用同一个复习器（createReviewer）：闭卷 → 三档 → 答完给锚点回源。
+  // 差异只有「回源」怎么实现：这里回课里那一段，图书馆开材料原文。
+  const reviewer = createReviewer({
+    stage: stage,
+    getQueue: async () => {
+      // 到期由内核给（它从 reviews.jsonl 算，items.jsonl 不参与调度）。
+      // 内核没回 ≠ 今天没有题：这两件事在界面上长得一样，必须分开说。
+      const r = await learnCall(P, { cmd: 'due', asof: todayStr() });
+      if (!r || !r.ok) return { err: r || { msg: '内核没回' } };
+      return { queue: interleaveByLesson(r.items || []) };
+    },
+    reveal: (it) => learnCall(P, { cmd: 'reveal', item: it.id }),
+    grade: (it, g) => learnCall(P, { cmd: 'review', item: it.id, grade: g }),
+    openSource: (it) => gotoAnchor(it),
+    onGraded: () => { if (window.onLearnItems) window.onLearnItems(); },
+    metaOf: (it, i, n) => '第 ' + (i + 1) + ' / ' + n + ' 题 · 课 ' + it.lesson + ' · ' + (it.kind || ''),
+    emptyText: '今天没有到期的题。'
+  });
+
+  async function review() {
+    ctx.wantReview = true;      // 挂载期间来的复习请求 → 别让首屏的「下一课」把它冲掉
+    setTab('review');
+    await reviewer.start();
+  }
+
+  // 回源：在课里按锚点关键词找到那一段，滚过去并点亮
+  async function gotoAnchor(it) {
+    const ls = await learnLessons(P);
+    const L = ls.find((x) => String(x.no) === String(it.lesson)) || ls[0];
+    if (!L) return;
+    await open(L.path);
+    const kw = String(it.anchor || '').split(/\s+/).filter(Boolean).pop() || '';
+    if (!kw || !ctx.wv) return;
+    const js = '(function(){var kw=' + JSON.stringify(kw) + ';' +
+      'var w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT),n,hit=null;' +
+      'while(n=w.nextNode()){if(n.nodeValue&&n.nodeValue.indexOf(kw)>=0){hit=n.parentElement;break}}' +
+      'if(!hit)return false;hit.scrollIntoView({block:"center",behavior:"smooth"});' +
+      'hit.style.transition="background .3s";hit.style.background="#fff3bf";' +
+      'setTimeout(function(){hit.style.background=""},2400);return true})()';
+    // webview 刚建出来时还没加载完，executeJavaScript 会打空——等 dom-ready，最多 3 秒
+    await new Promise((res) => {
+      const wv = ctx.wv;
+      if (!wv) return res();
+      let done = false;
+      const fin = () => { if (!done) { done = true; res(); } };
+      try { wv.addEventListener('dom-ready', fin, { once: true }); } catch (e) {}
+      setTimeout(fin, 3000);
+    });
+    try { const p2 = ctx.wv.executeJavaScript(js); if (p2 && p2.catch) p2.catch(() => {}); } catch (e) {}
+  }
+
+  bL.addEventListener('click', async () => {
+    setTab('lesson');
+    if (ctx.lesson) { open(ctx.lesson.path); return; }
+    const ls = await learnLessons(P);
+    const next = await learnNext(P, ls);
+    if (next) open(next.path); else stage.appendChild(el('div', 'ph', 'lessons/ 里还没有课'));
+  });
+  bR.addEventListener('click', () => review());
+
+  // 供左侧导航调用（工作台既有的跨面板约定：目标面板挂方法，点击方按 data-preview 找）
+  box._learn = { open, review };
+
+  // 首屏：默认「下一课」——没完成的课里编号最小的那门。
+  // 但如果挂载期间有人喊了「复习」（图书馆面板把课程的卡跳过来复习），
+  // 就别再自动开课——open() 会清空 stage，把刚起的复习队列冲掉（2026-10-30 修的竞态）。
+  const ls0 = await learnLessons(P);
+  if (ctx.wantReview) return;
+  const next0 = await learnNext(P, ls0);
+  if (next0) open(next0.path);
+  else stage.appendChild(el('div', 'ph', 'lessons/ 里还没有课'));
+}
+
+// 左栏：主题 + 今日到期 + 课列表 + 题库进度
+async function renderLearnNav(body, p) {
+  const P = learnPaths(p);
+  body.classList.add('ln-nav');
+
+  const draw = async () => {
+    // 首次渲染时 buildPanel 还没把 box 挂进 grid（同步调用就到了这里），
+    // body.isConnected 必然是 false。拿它当「面板已切走」的判据，左栏就是永远空白
+    // ——19:22 那版就是这个坑，DOM 里 body 有 ln-nav 类却一个字都没有。
+    // 真判据：先画过一次、之后又掉出 DOM，才算切走（onLearnItems 单槽可能指向旧面板）。
+    if (body.__drawn && !body.isConnected) return;
+    body.__drawn = true;
+    body.innerHTML = '<div class="ph">读取课程…</div>';
+    const [ls, st, mis] = await Promise.all([learnLessons(P), learnCall(P, { cmd: 'stats', asof: todayStr() }), readTextFile(P.mission)]);
+    body.innerHTML = '';
+    // 统计一次问内核，界面自己数就会数出旧口径（items 里早就没有 due/state 了）
+    const stat = st.ok ? st : null;
+    const dueN = stat ? Number(stat.due || 0) : 0;
+    const delivered = (stat && stat.delivered) || [];
+
+    const head = el('div', 'ln-topic');
+    head.appendChild(el('div', 'ln-topic-k', '当前课程'));
+    head.appendChild(el('div', 'ln-topic-name', p.topic || '学习'));
+    const goal = mis.ok ? learnGoal(mis.text) : '';
+    if (goal) head.appendChild(el('div', 'ln-topic-goal', goal));
+    body.appendChild(head);
+
+    const tb = el('div', 'ln-today');
+    tb.appendChild(el('div', 'ln-cap', '今日'));
+    if (!stat) {
+      // 读不到 ≠ 没有到期题。这两件事长得一样，必须分开说（同「plan 缺失要有自己的 reason」）
+      tb.appendChild(el('div', 'ln-today-n', '读不到（未判定）：' + (st.msg || st.code)));
+    } else {
+      tb.appendChild(el('div', 'ln-today-n' + (dueN ? ' hot' : ''), dueN ? dueN + ' 题到期' : '没有到期的题'));
+    }
+    if (dueN) {
+      const go = el('button', 'ln-go', '开始复习');
+      go.addEventListener('click', () => {
+        const t = document.querySelector('[data-preview="ln-main"]');
+        if (t && t._learn) t._learn.review();
+      });
+      tb.appendChild(go);
+    }
+    body.appendChild(tb);
+
+    body.appendChild(el('div', 'ln-cap', '课 · ' + ls.length));
+    const list = el('div', 'ln-lessons');
+    if (!ls.length) list.appendChild(el('div', 'ln-empty', 'lessons/ 里还没有课'));
+    ls.forEach((L) => {
+      // 完成以 records.jsonl（内核 delivered）为准；records/*.md 是笔记，不是证据
+      const done = delivered.indexOf(String(L.no)) >= 0;
+      const row = el('button', 'ln-lesson' + (done ? ' done' : ''));
+      row.title = L.name;
+      row.appendChild(el('span', 'ln-lesson-no', L.no));
+      row.appendChild(el('span', 'ln-lesson-t', L.title));
+      row.appendChild(el('span', 'ln-lesson-st', done ? '✓' : '·'));
+      row.addEventListener('click', () => {
+        const t = document.querySelector('[data-preview="ln-main"]');
+        if (t && t._learn) t._learn.open(L.path);
+      });
+      list.appendChild(row);
+    });
+    body.appendChild(list);
+
+    const seen = stat ? Number(stat.reviewed || 0) : 0;
+    body.appendChild(el('div', 'ln-foot',
+      stat ? ('题库 ' + stat.items + ' 题 · 已复 ' + seen + ' · 到期 ' + dueN) : '题库：内核没回，数字暂缺'));
+  };
+
+  window.onLearnItems = draw;     // 主区写完题/记录后回调（单槽，避免监听器越挂越多）
+  await draw();
+}
+
 async function renderPcPanel(body, type) {
   if (type === 'pc-drives') {
     // 定时刷新：一天一次（够用，不折腾）；另点面板任意处立即重查
@@ -1556,7 +1922,7 @@ async function loadEngine() {
       }
     }
     engineLoaded = false;
-    engineShowOff('引擎端口通着，但页面一直没加载出来。点重试再试一次；反复如此就重启 boot.cjs（node boot.cjs）或重启 DSH 引擎。');
+    engineShowOff('引擎端口通着，但页面一直没加载出来。点重试再试一次；反复如此就用「启动工作台.vbs」重启。');
   } finally {
     engineBusy = false;
   }
@@ -1582,8 +1948,12 @@ async function mountExtGroup() {
   };
   const b1 = document.getElementById('btn-mubu');
   const b2 = document.getElementById('btn-workbuddy');
-  if (b1) b1.onclick = () => launch('幕布', 'D:/幕布/Mubu/幕布.exe');
-  if (b2) b2.onclick = () => launch('WorkBuddy', 'C:/Users/Administrator/AppData/Local/Programs/WorkBuddy/WorkBuddy.exe');
+  // 快捷启动的可执行文件路径走 config.json 的 apps；没配就把按钮藏起来，
+  // 别留一个「点了必然报错」的按钮（点了没反应/弹错是最难查的一类问题）。
+  let apps = {};
+  try { const c = await API.app.config(); apps = (c && c.apps) || {}; } catch (e) { apps = {}; }
+  if (b1) { if (apps.mubu) b1.onclick = () => launch('幕布', apps.mubu); else b1.style.display = 'none'; }
+  if (b2) { if (apps.workbuddy) b2.onclick = () => launch('WorkBuddy', apps.workbuddy); else b2.style.display = 'none'; }
 }
 
 // ── 外观（深/浅/跟随系统）─────────────────────────────
@@ -1685,3 +2055,491 @@ async function loadScenarios() {
   applyPanelNums();
   mark('first-paint-ready');
 })();
+
+// ═══════════════════════════════════════════════════════════════
+// 图书馆（library 场景）· 渲染层
+//
+// 三条硬规则（规格第二节）：
+//   1. 面板零调度——到期数、间隔、判分全问内核，界面不许自己算；
+//   2. 树由 units 派生——不落第二份树文件，这里每次现算；
+//   3. 卡片就是 items——界面不新建卡片数据结构。
+// 「读不到」和「没有」必须分开说：内核没回要显示「读不到（未判定）」，不能显示成「没有」。
+// ═══════════════════════════════════════════════════════════════
+
+const LIB_FOLD_PREFIX = 'wb.lib.fold.lib-tree.';
+
+// ── vault 读取层（2026-10-30 改：Obsidian 唯一真源）──────────────
+// 直读 vault 的 .md：fs:list 递归 + fs:read + 解析 frontmatter。
+// 不派生索引、不依赖 Obsidian 开着。护栏：限深 4 层、节点上限 3000、点目录全跳过。
+// 不写死任何人的路径：真实 vault 目录由 config.json 的 libraryRoot 注入（main.js readScenarios 覆盖面板 root）。
+const VAULT_DEFAULT = '';
+const LIB_MAX_DEPTH = 4;
+const LIB_MAX_NODES = 3000;
+const LIB_SKIP_DIRS = { '.obsidian': 1, '.trash': 1, '.git': 1, '.log': 1 };
+
+let LIB_CACHE = null;
+function libInvalidate() { LIB_CACHE = null; }
+
+async function libScanVault(root) {
+  const files = [], errors = [];
+  let n = 0, truncated = false;
+  async function walk(dirAbs, rel, depth) {
+    if (depth > LIB_MAX_DEPTH) { errors.push('超过 4 层：' + (rel || '/')); return; }
+    if (n >= LIB_MAX_NODES) { truncated = true; return; }
+    const ls = await API.fs.list(dirAbs);
+    if (!ls || !ls.ok) { errors.push('读不到目录：' + (rel || '/') + '（' + ((ls && ls.why) || '原因不明') + '）'); return; }
+    for (const it of (ls.items || [])) {
+      if (n >= LIB_MAX_NODES) { truncated = true; return; }
+      if (it.dir) {
+        if (LIB_SKIP_DIRS[it.name] || it.name.charAt(0) === '.') continue;
+        await walk(dirAbs + '/' + it.name, rel ? rel + '/' + it.name : it.name, depth + 1);
+      } else if (/\.md$/i.test(it.name)) {
+        n++;
+        files.push({ rel: rel ? rel + '/' + it.name : it.name, abs: dirAbs + '/' + it.name });
+      }
+    }
+  }
+  await walk(root, '', 0);
+  return { files, errors, truncated, count: n };
+}
+
+async function libLoad(p) {
+  const root = String(p.root || VAULT_DEFAULT || '').replace(/[\\/]+$/, '');
+  const vaultName = p.vault || (root ? root.split(/[\\/]/).pop() : '') || '未配置数据目录';
+  if (!root) {
+    // 没配 libraryRoot 时「读不到」和「没有笔记」必须分开说，否则用户会以为知识库是空的
+    return {
+      root: '', vaultName, notes: [], tree: window.LibModel.buildVaultTree([]),
+      scan: { files: [], errors: ['未配置 libraryRoot：在 shell/config.json 里把 libraryRoot 指向你的 Obsidian vault 目录'], truncated: false, count: 0 },
+      dataSource: 'vault'
+    };
+  }
+  if (LIB_CACHE && LIB_CACHE.root === root) return LIB_CACHE;
+  const scan = await libScanVault(root);
+  const notes = [];
+  for (const f of scan.files) {
+    let text = '', readWhy = null;
+    try {
+      const r = await API.fs.read(f.abs);
+      if (r && r.ok && typeof r.text === 'string') text = r.text;
+      else readWhy = (r && r.why) || '读不到';
+    } catch (e) { readWhy = e.message; }
+    const pf = window.LibModel.parseFrontmatter(text);
+    const fm = pf.fm || {};
+    const segs = f.rel.split('/');
+    const folder = segs.length > 1 ? segs[0] : '';
+    const tags = Array.isArray(fm.tags) ? fm.tags : (fm.tags ? [fm.tags] : []);
+    const bodyLines = String(pf.body || '').split('\n');
+    notes.push({
+      key: fm.src_id || f.rel,
+      path: f.rel,
+      abs: f.abs,
+      folder: folder,
+      board: window.LibModel.BOARD_OF[folder] || 'other',
+      title: fm.title || segs[segs.length - 1].replace(/\.md$/i, ''),
+      tags: tags,
+      status: fm.status || 'unknown',
+      src_id: fm.src_id || '',
+      score: (fm.score != null && fm.score !== '') ? fm.score : 0,
+      fm: fm,
+      noFm: !pf.hasFm,
+      fmError: pf.error || null,
+      body: pf.body || '',
+      lines: bodyLines.length,
+      untracked: !fm.src_id,
+      readErr: readWhy,
+    });
+  }
+  const tree = window.LibModel.buildVaultTree(notes);
+  const D = { root, vaultName, notes, tree, scan, dataSource: p.dataSource || 'vault' };
+  LIB_CACHE = D;
+  return D;
+}
+
+function libFindNote(D, key) {
+  for (const n of (D.notes || [])) if (n.key === key || n.path === key) return n;
+  return null;
+}
+
+// 轻提示：失败要看得见。这个项目最容易踩的坑就是「点了没反应」——
+// 调用失败被静默吞掉，比报错更难查。
+let LIB_TOAST_T = null;
+function libToast(msg) {
+  let t = document.querySelector('.lib-toast');
+  if (!t) { t = el('div', 'lib-toast'); document.body.appendChild(t); }
+  t.textContent = String(msg || '');
+  t.classList.add('on');
+  clearTimeout(LIB_TOAST_T);
+  LIB_TOAST_T = setTimeout(() => t.classList.remove('on'), 3600);
+}
+
+// 统一出口：所有「打开外部」都走这里，失败自动出声
+function openExternalSafe(uri, label) {
+  if (!(API.app && API.app.openExternal)) { libToast(label + '：当前环境不支持打开外部链接'); return; }
+  Promise.resolve(API.app.openExternal(uri))
+    .then((r) => { if (r && r.ok === false) libToast(label + '：' + (r.why || '未知原因')); })
+    .catch((e) => libToast(label + '：' + ((e && e.message) || '调用失败')));
+}
+
+// 跳转 Obsidian：URI 已编码，交给 shell.openExternal（只编一次，防 %2520）
+function openObsidian(D, rel) {
+  openExternalSafe(window.LibModel.obsidianUri(D.vaultName, rel), '打不开 Obsidian');
+}
+
+// ── 共用复习器：学习界面与图书馆用的是同一个 factory ──────────
+// 差别的只有「回源」——学习界面滚到课里那一段，图书馆打开材料原文。
+// 判分、间隔、调度全在内核（learn_cli），这里只发命令、画界面。
+function createReviewer(opts) {
+  const stage = opts.stage;
+  const ctx = { queue: [], qi: 0, stat: { good: 0, hard: 0, again: 0 }, err: null };
+
+  async function start() {
+    ctx.err = null;
+    ctx.qi = 0;
+    ctx.stat = { good: 0, hard: 0, again: 0 };
+    const r = await opts.getQueue();
+    if (r && r.err) { ctx.err = r.err; ctx.queue = []; }
+    else ctx.queue = (r && r.queue) || [];
+    drawQ();
+  }
+
+  function drawQ() {
+    stage.innerHTML = '';
+    if (ctx.err) {
+      stage.appendChild(el('div', 'ph', '读不到到期题（未判定）：' + (ctx.err.msg || ctx.err.code)));
+      return;
+    }
+    if (!ctx.queue.length) {
+      stage.appendChild(el('div', 'ph', opts.emptyText || '今天没有要复习的。'));
+      return;
+    }
+    if (ctx.qi >= ctx.queue.length) { drawEnd(); return; }
+    const it = ctx.queue[ctx.qi];
+    const card = el('div', 'ln-q');
+    // 抬头由调用方给（学习界面显示「课 NN」，图书馆显示「领域」）；不给就用默认的。
+    const meta = opts.metaOf
+      ? opts.metaOf(it, ctx.qi, ctx.queue.length)
+      : ('第 ' + (ctx.qi + 1) + ' / ' + ctx.queue.length + ' 题' + (it._domain ? ' · ' + it._domain : ''));
+    card.appendChild(el('div', 'ln-q-meta', meta));
+    card.appendChild(el('div', 'ln-q-stem', it.stem));
+    const acts = el('div', 'ln-q-acts');
+    const ansBox = el('div', 'ln-q-ans');
+    ansBox.style.display = 'none';
+    const anchorBox = el('div', 'ln-q-anchor');
+    anchorBox.style.display = 'none';
+
+    const mkBtn = (label, g, show) => {
+      const b = el('button', 'ln-rate ln-' + g, label);
+      b.addEventListener('click', async () => {
+        if (show) {
+          // 答案单独要（due 里不带宽答案，否则等于随题送到前端）
+          const rv = await opts.reveal(it);
+          ansBox.textContent = rv && rv.ok ? rv.answer : ('（取不到答案：' + ((rv && (rv.msg || rv.code)) || '内核没回') + '）');
+          ansBox.style.display = '';
+          anchorBox.innerHTML = '';
+          anchorBox.appendChild(el('span', 'ln-anchor-t', '锚点 · ' + (it.anchor || '无')));
+          if (it.anchor) {
+            const jump = el('button', 'ln-jump', '回到那一段');
+            jump.addEventListener('click', () => opts.openSource(it));
+            anchorBox.appendChild(jump);
+          }
+          anchorBox.style.display = '';
+          acts.innerHTML = '';
+          const nx = el('button', 'ln-go', '下一题');
+          nx.addEventListener('click', () => { ctx.qi += 1; drawQ(); });
+          acts.appendChild(nx);
+        } else {
+          ctx.qi += 1; drawQ();
+        }
+        await grade(it, g);
+      });
+      return b;
+    };
+    acts.appendChild(mkBtn('不会 · 看答案', 'again', true));
+    acts.appendChild(mkBtn('模糊 · 看答案', 'hard', true));
+    acts.appendChild(mkBtn('会 · 下一题', 'good', false));
+    card.appendChild(acts);
+    card.appendChild(ansBox);
+    card.appendChild(anchorBox);
+    stage.appendChild(card);
+  }
+
+  // 三档评分：调度（again 回 1 天 / hard 停档 / good 升档）由内核算并落 reviews.jsonl
+  async function grade(it, g) {
+    const r = await opts.grade(it, g);
+    if (!r || !r.ok) {
+      stage.appendChild(el('div', 'ln-warn', '这次评分没记上（未判定）：' + ((r && (r.msg || r.code)) || '内核没回')));
+      return;
+    }
+    ctx.stat[g] += 1;
+    if (opts.onGraded) opts.onGraded();
+  }
+
+  function drawEnd() {
+    const s = ctx.stat;
+    const box2 = el('div', 'ln-end');
+    box2.appendChild(el('div', 'ln-end-t', '这轮复习完了'));
+    box2.appendChild(el('div', 'ln-end-n', '共 ' + ctx.queue.length + ' 题 · 会 ' + s.good + ' · 模糊 ' + s.hard + ' · 不会 ' + s.again));
+    const again = el('button', 'ln-go', '再看一遍今天的');
+    again.addEventListener('click', () => start());
+    box2.appendChild(again);
+    stage.appendChild(box2);
+  }
+
+  return { start: start, ctx: ctx };
+}
+
+// ── 左栏：知识树（vault 版）──────────────────────────────────────
+// 顶层顺序写死：收件箱 → 领域 → 来源 → 归档（不跟文件系统枚举顺序走）
+async function renderLibTree(body, p) {
+  body.classList.add('lib-tree');
+
+  const dotColor = (n) => {
+    if (n.fmError) return '#d9534f';          // 红：frontmatter 解析失败
+    if (n.noFm) return '#9aa0a6';             // 灰：没有 frontmatter
+    if (n.status === 'note') return '#3a9d6e';// 绿：原子笔记
+    if (n.status === 'raw') return '#8a8f98'; // 灰蓝：原文
+    return '#c08a2e';                          // 橙：status 缺失/未知
+  };
+
+  const draw = async () => {
+    // 首屏 body 还没挂进 grid，isConnected 必为 false——判据见 renderLearnNav 的注释
+    if (body.__drawn && !body.isConnected) return;
+    body.__drawn = true;
+    body.innerHTML = '<div class="ph">读 vault…</div>';
+    const D = await libLoad(p);
+    body.innerHTML = '';
+
+    const c = D.tree.counts || {};
+    const head = el('div', 'lib-head');
+    head.appendChild(el('div', 'lib-head-t', '知识树'));
+    head.appendChild(el('div', 'lib-head-s',
+      '数据源：vault · ' + (c.note || 0) + ' 篇笔记 · 收件箱 ' + D.tree.inbox.length +
+      ' · 原文 ' + (c.raw || 0) +
+      (c.untracked ? ' · ' + c.untracked + ' 未纳管' : '') +
+      (c.fmError ? ' · ' + c.fmError + ' 解析失败' : '')));
+    const re = el('button', 'lib-refresh', '刷新');
+    re.title = '重新读一遍 vault';
+    re.addEventListener('click', async () => { libInvalidate(); await draw(); });
+    head.appendChild(re);
+    body.appendChild(head);
+
+    // 顶部「规范」入口：06 不进树，但要有门
+    const specRow = el('div', 'lib-row lib-row-spec');
+    specRow.style.cursor = 'default';
+    specRow.appendChild(el('span', 'lib-name', '📘 知识库规范'));
+    const sp = el('button', 'lib-link', '打开');
+    sp.addEventListener('click', () => openObsidian(D, '06系统配置/知识库规范.md'));
+    specRow.appendChild(sp);
+    body.appendChild(specRow);
+
+    if (D.scan.truncated) body.appendChild(el('div', 'lib-warn', '节点超过 ' + LIB_MAX_NODES + ' 个，只读了前 ' + LIB_MAX_NODES + ' 个（请分域或调高上限）。'));
+    (D.scan.errors || []).forEach((e) => body.appendChild(el('div', 'lib-warn', e)));
+
+    if (!D.notes.length) {
+      body.appendChild(el('div', 'lib-empty', 'vault 里还没有 .md 笔记。'));
+      return;
+    }
+
+    const list = el('div', 'lib-list');
+    const foldKey = (id) => LIB_FOLD_PREFIX + id;
+    const isFold = (id) => { try { return localStorage.getItem(foldKey(id)) === '1'; } catch (e) { return false; } };
+    const setFold = (id, v) => { try { localStorage.setItem(foldKey(id), v ? '1' : '0'); } catch (e) {} };
+
+    const pick = (note) => {
+      const t = document.querySelector('[data-preview="lib-unit"]');
+      if (t && t._lib) t._lib.show({ type: 'note', key: note.key });
+    };
+
+    // 笔记行
+    const noteRow = (n, depth) => {
+      const row = el('div', 'lib-row lib-row-unit lib-row-d' + depth);
+      const dot = el('span', 'lib-dot');
+      dot.style.background = dotColor(n);
+      dot.style.borderRadius = '50%';
+      dot.title = n.fmError ? ('解析失败：' + n.fmError) : (n.noFm ? '没有 frontmatter' : ('status: ' + n.status));
+      row.appendChild(dot);
+      row.appendChild(el('span', 'lib-name', n.title || n.path));
+      const meta = el('span', 'lib-meta');
+      if (n.untracked) { const u = el('span', 'lib-m', '未纳管'); u.style.color = '#d9a400'; meta.appendChild(u); }
+      if (n.score && Number(n.score) > 0) meta.appendChild(el('span', 'lib-m', n.score + ' 分'));
+      if (n.lines) meta.appendChild(el('span', 'lib-m', n.lines + ' 行'));
+      row.appendChild(meta);
+      row.title = n.path;
+      row.addEventListener('click', () => pick(n));
+      return row;
+    };
+
+    // 折叠组（收件箱 / 领域 / 来源 / 归档）
+    const groupRow = (id, name, metaText, kids) => {
+      const wrap = el('div', 'lib-grp');
+      const folded = isFold(id);
+      const row = el('div', 'lib-row lib-row-d0 lib-row-dom');
+      row.appendChild(el('span', 'lib-caret', folded ? '▸' : '▾'));
+      row.appendChild(el('span', 'lib-name', name));
+      if (metaText) row.appendChild(el('span', 'lib-meta', metaText));
+      row.addEventListener('click', () => { setFold(id, folded); draw(); });
+      wrap.appendChild(row);
+      if (!folded) {
+        const box = el('div', 'lib-kids');
+        kids.forEach((k) => box.appendChild(k));
+        wrap.appendChild(box);
+      }
+      return wrap;
+    };
+
+    const noteList = (arr, depth) => {
+      const b = el('div');
+      arr.forEach((n) => b.appendChild(noteRow(n, depth)));
+      return b;
+    };
+
+    // 1. 收件箱（status=raw 的积压）
+    if (D.tree.inbox.length) {
+      list.appendChild(groupRow('inbox', '收件箱', D.tree.inbox.length + ' 篇待处理', [noteList(D.tree.inbox, 2)]));
+    }
+
+    // 2. 领域 → 类型 → 笔记
+    D.tree.domains.forEach((d) => {
+      const typeNodes = d.types.map((t) => {
+        const b = el('div');
+        const tid = 'type:' + d.name + '/' + t.name;
+        const folded2 = isFold(tid);
+        const r = el('div', 'lib-row lib-row-d1 lib-row-top');
+        r.appendChild(el('span', 'lib-caret', folded2 ? '▸' : '▾'));
+        r.appendChild(el('span', 'lib-name', t.name));
+        r.appendChild(el('span', 'lib-meta', t.notes.length + ' 篇'));
+        r.addEventListener('click', () => { setFold(tid, folded2); draw(); });
+        b.appendChild(r);
+        if (!folded2) b.appendChild(noteList(t.notes, 3));
+        return b;
+      });
+      list.appendChild(groupRow('dom:' + d.name, d.name, d.nNotes + ' 篇', typeNodes));
+    });
+
+    // 3. 来源（02 原文）
+    if (D.tree.sources.length) {
+      list.appendChild(groupRow('sources', '来源（原文）', D.tree.sources.length + ' 篇', [noteList(D.tree.sources, 2)]));
+    }
+
+    // 4. 归档
+    if (D.tree.archived.length) {
+      list.appendChild(groupRow('archived', '归档', D.tree.archived.length + ' 篇', [noteList(D.tree.archived, 2)]));
+    }
+
+    body.appendChild(list);
+  };
+
+  // 别和到期面板共用一个全局槽（后挂顶掉先挂 → 重画错面板，2026-10-30 修）
+  window.onLibTree = draw;
+  await draw();
+}
+
+// ── 中栏：知识单元（vault 版：标题 + frontmatter + 前 40 行 + 跳转）──
+async function renderLibUnit(body, p, box) {
+  body.classList.add('lib-unit');
+  let sel = null;   // {type:'note', key}
+
+  const show = async (target) => { sel = target; await draw(); };
+  // 挂在 box 上，不是 body 上：树用 [data-preview="lib-unit"] 找的是 box（2026-10-30 实测）
+  box._lib = { show: show };
+
+  const draw = async () => {
+    if (body.__drawn && !body.isConnected) return;
+    body.__drawn = true;
+    const D = await libLoad(p);
+    body.innerHTML = '';
+
+    if (!sel) {
+      body.appendChild(el('div', 'lib-empty', '左边点一条笔记，这里显示 frontmatter 和正文前 40 行。全文在 Obsidian 里读。'));
+      return;
+    }
+    if (sel.type !== 'note') {
+      body.appendChild(el('div', 'lib-empty', '选中项不是笔记。'));
+      return;
+    }
+    const n = libFindNote(D, sel.key);
+    if (!n) { body.appendChild(el('div', 'lib-warn', '这条笔记找不到了（可能刚改名或移动）。')); return; }
+
+    const card = el('div', 'lib-card');
+    const top = el('div', 'lib-card-top');
+    top.appendChild(el('span', 'lib-kind-t', n.folder || '—'));
+    top.appendChild(el('span', 'lib-crumb', n.path));
+    card.appendChild(top);
+    card.appendChild(el('div', 'lib-card-title', n.title || n.path));
+
+    // 状态与主键
+    const facts = el('div', 'lib-facts');
+    facts.appendChild(el('span', 'lib-fact', 'status: ' + n.status));
+    if (n.src_id) facts.appendChild(el('span', 'lib-fact', 'id: ' + n.src_id));
+    else facts.appendChild(el('span', 'lib-fact warn', '未纳管（缺 src_id）'));
+    if (n.score) facts.appendChild(el('span', 'lib-fact', '评分 ' + n.score));
+    if (n.fmError) facts.appendChild(el('span', 'lib-fact warn', '解析失败：' + n.fmError));
+    else if (n.noFm) facts.appendChild(el('span', 'lib-fact', '没有 frontmatter'));
+    if (n.readErr) facts.appendChild(el('span', 'lib-fact warn', '读不到：' + n.readErr));
+    card.appendChild(facts);
+
+    // 标签
+    if (n.tags && n.tags.length) {
+      const tf = el('div', 'lib-facts');
+      n.tags.forEach((t) => tf.appendChild(el('span', 'lib-fact', '#' + t)));
+      card.appendChild(tf);
+    }
+
+    // 跳转
+    const row = el('div', 'lib-src-row');
+    const open = el('button', 'lib-link', '在 Obsidian 打开');
+    open.addEventListener('click', () => openObsidian(D, n.path));
+    row.appendChild(open);
+    card.appendChild(row);
+
+    // 正文前 40 行纯文预览（不渲染 md）
+    const lines = String(n.body || '').replace(/\r\n/g, '\n').split('\n');
+    const pre = el('pre', 'lib-quote-pre');
+    pre.style.whiteSpace = 'pre-wrap';
+    pre.textContent = lines.slice(0, 40).join('\n') || '（正文为空）';
+    card.appendChild(pre);
+    if (lines.length > 40) card.appendChild(el('div', 'lib-note', '…还有 ' + (lines.length - 40) + ' 行，点「在 Obsidian 打开」看全文。'));
+
+    body.appendChild(card);
+  };
+
+  await draw();
+}
+
+// ── 右栏：复习入口（vault 版：不读 due，只做启动器）──────────────
+async function renderLibDue(body, p) {
+  body.classList.add('lib-due');
+
+  const draw = async () => {
+    if (body.__drawn && !body.isConnected) return;
+    body.__drawn = true;
+    const D = await libLoad(p);
+    body.innerHTML = '';
+
+    const head = el('div', 'lib-head');
+    head.appendChild(el('div', 'lib-head-t', '今日到期'));
+    body.appendChild(head);
+
+    body.appendChild(el('div', 'lib-note', '复习在 Obsidian 里进行（Spaced Repetition 插件）。这边只做入口：不读 due、不记分、不调度。'));
+
+    const go = el('button', 'lib-go', '去 Obsidian 复习');
+    go.addEventListener('click', () => {
+      openExternalSafe('obsidian://open?vault=' + encodeURIComponent(D.vaultName), '打不开 Obsidian');
+    });
+    body.appendChild(go);
+
+    const go2 = el('button', 'lib-link', '打开 vault 文件夹');
+    go2.addEventListener('click', () => {
+      if (API.app && API.app.openPath) {
+        Promise.resolve(API.app.openPath(D.root)).then((r) => {
+          const err = r && (r.err || (r.ok === false ? r.why : ''));
+          if (err) libToast('打不开文件夹：' + err);
+        }).catch((e) => libToast('打不开文件夹：' + ((e && e.message) || '调用失败')));
+      } else libToast('打开文件夹：当前环境不支持');
+    });
+    body.appendChild(go2);
+  };
+
+  await draw();
+}

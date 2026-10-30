@@ -28,7 +28,7 @@ python tools/ds_read.py --diff     # 同时报告与上次导出是否相同
 
 ## 输入
 - 发送：正文文件 `tools/to_ds.txt`。
-- 读取：DSH 会话落盘 `C:\Users\Administrator\.dsh\sessions\...\session.v4.jsonl.zstd`。
+- 读取：DSH 会话落盘 `~/.dsh/sessions\...\session.v4.jsonl.zstd`。
 
 ## 输出
 - 发送：`status = 200`，返回体含 `accepted: true`。

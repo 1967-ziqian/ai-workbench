@@ -3,6 +3,12 @@
   "engineToken": "",
   "methodLibraryRoot": "../method-library",
   "selfReviewRoot": "../self-review",
+  "libraryRoot": "",
+  "learnRoot": "",
+  "apps": {
+    "mubu": "",
+    "workbuddy": ""
+  },
   "dshCmd": "dsh",
-  "_note": "engineUrl/engineToken 填 DSH web 引擎地址与 token。methodLibraryRoot/selfReviewRoot 是你的方法库与复盘目录（绝对路径，或相对本插件目录的相对路径）。dshCmd 是 DSH 引擎可执行命令（默认 dsh，找不到就填绝对路径）。本机私密配置写 config.local.json，不入库。"
+  "_note": "engineUrl/engineToken 填 DSH web 引擎地址与 token。methodLibraryRoot/selfReviewRoot/libraryRoot/learnRoot 是各功能区目录（绝对路径，或相对本插件目录的相对路径）：libraryRoot 指向你的 Obsidian vault；learnRoot 指向学习工作区（不填则用插件目录下的『学习』）。apps.mubu / apps.workbuddy 填可执行文件绝对路径，不填则顶栏对应按钮隐藏。本机私密配置写 config.local.json，不入库。"
 }

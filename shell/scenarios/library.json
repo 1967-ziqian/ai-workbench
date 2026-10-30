@@ -1,0 +1,48 @@
+{
+  "id": "library",
+  "name": "图书馆",
+  "description": "图书馆：直读 Obsidian vault（唯一真源）。左边是知识树（收件箱 → 领域 → 类型 → 笔记 / 来源 / 归档），中间是选中笔记的 frontmatter + 正文前 40 行 + 跳转 Obsidian，右边只是复习入口（间隔重复在 Obsidian 的 Spaced Repetition 插件里做，这里不读 due、不记分）。",
+  "layout": "grid",
+  "theme": "dark",
+  "panels": [
+    {
+      "id": "lib-tree",
+      "title": "知识树",
+      "sub": "收件箱 → 领域 → 类型",
+      "type": "lib-tree",
+      "root": "",
+      "vault": "",
+      "dataSource": "vault",
+      "col": 1,
+      "row": 1,
+      "w": 1,
+      "h": 1
+    },
+    {
+      "id": "lib-unit",
+      "title": "知识单元",
+      "sub": "frontmatter / 正文预览 / 跳转",
+      "type": "lib-unit",
+      "root": "",
+      "vault": "",
+      "dataSource": "vault",
+      "col": 2,
+      "row": 1,
+      "w": 2,
+      "h": 1
+    },
+    {
+      "id": "lib-due",
+      "title": "今日到期",
+      "sub": "入口 · 复习在 Obsidian 里",
+      "type": "lib-due",
+      "root": "",
+      "vault": "",
+      "dataSource": "vault",
+      "col": 4,
+      "row": 1,
+      "w": 1,
+      "h": 1
+    }
+  ]
+}

@@ -19,7 +19,12 @@ contextBridge.exposeInMainWorld('kun', {
   fs: {
     list: (dir) => ipcRenderer.invoke('fs:list', dir),
     read: (p) => ipcRenderer.invoke('fs:read', p),
+    // 只对学习工作区开放；主进程侧有路径/扩展名/大小三重白名单，这里不加逻辑
+    write: (p, text) => ipcRenderer.invoke('fs:write', p, text),
   },
+  // 学习内核通道：到期、判分、续点、复习评分全在 Python 内核算，
+  // 界面**不许自己复刻一遍**（复刻过一次，due 全错、还把 items.jsonl 整体重写丢了 seq）
+  learn: { call: (req) => ipcRenderer.invoke('learn:call', req) },
   webai: { open: (key, url, title) => ipcRenderer.invoke('webai:open', key, url, title) },
   win: {
     control: (action) => ipcRenderer.invoke('win:control', action),
